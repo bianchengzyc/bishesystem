@@ -9,12 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.13",
-    "vue-router": "^4.4.5",
-    "pinia": "^2.2.6",
+    "axios": "^1.7.9",
     "element-plus": "^2.8.4",
+    "geotiff": "^2.1.4-beta.1",
     "leaflet": "^1.9.4",
-    "axios": "^1.7.9"
+    "pinia": "^2.2.6",
+    "proj4": "^2.20.2",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",

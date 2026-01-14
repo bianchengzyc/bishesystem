@@ -118,7 +118,18 @@
       <el-table-column prop="file_name" label="图像名称" min-width="200" />
       <el-table-column label="缩略图" width="120">
         <template #default="scope">
+          <div v-if="scope.row.file_path?.toLowerCase().endsWith('.tif') || scope.row.file_path?.toLowerCase().endsWith('.tiff')">
+            <!-- TIFF图像缩略图（使用Canvas渲染） -->
+            <canvas 
+              :ref="el => setCanvasRef(el, scope.row.image_id)"
+              width="80" 
+              height="60"
+              style="width: 80px; height: 60px; cursor: pointer; object-fit: cover;"
+              @click="viewAnnotations(scope.row)"
+            />
+          </div>
           <el-image
+            v-else
             :src="getImageUrl(scope.row.file_path)"
             fit="cover"
             :preview-src-list="[getImageUrl(scope.row.file_path)]"
@@ -182,6 +193,7 @@ import { useAuthStore } from '../store/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { fromUrl } from 'geotiff'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -196,6 +208,138 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const selectedImages = ref([])
+const canvasRefs = ref({})
+
+// 设置Canvas引用
+const setCanvasRef = (el, imageId) => {
+  if (el) {
+    canvasRefs.value[imageId] = el
+  }
+}
+
+// 加载TIFF图像缩略图
+const loadTiffThumbnail = async (image) => {
+  try {
+    const canvas = canvasRefs.value[image.image_id]
+    if (!canvas) return
+    
+    const ctx = canvas.getContext('2d')
+    
+    // 获取图像URL
+    const imageUrl = getImageUrl(image.file_path)
+    
+    // 使用geotiff库加载TIFF图像
+    const tiff = await fromUrl(imageUrl)
+    
+    // 获取第一个图像（包含所有波段）
+    const firstImage = await tiff.getImage(0)
+    
+    // 获取图像尺寸
+    const width = firstImage.getWidth()
+    const height = firstImage.getHeight()
+    
+    // 读取所有波段数据
+    const rasterData = await firstImage.readRasters()
+    
+    // 获取波段数量
+    const numBands = firstImage.getSamplesPerPixel()
+    
+    // 创建缩放后的ImageData（缩略图尺寸）
+    const thumbnailWidth = 80
+    const thumbnailHeight = 60
+    const thumbnailData = ctx.createImageData(thumbnailWidth, thumbnailHeight)
+    
+    // 计算缩放比例
+    const scaleX = width / thumbnailWidth
+    const scaleY = height / thumbnailHeight
+    
+    // 根据波段数量选择合适的组合
+    if (numBands >= 3) {
+      // 使用前三个波段作为RGB
+      const rBand = 0
+      const gBand = 1
+      const bBand = 2
+      
+      const rData = rasterData[rBand]
+      const gData = rasterData[gBand]
+      const bData = rasterData[bBand]
+      
+      // 计算每个波段的最小值和最大值用于归一化
+      const rMin = Math.min(...rData)
+      const rMax = Math.max(...rData)
+      const gMin = Math.min(...gData)
+      const gMax = Math.max(...gData)
+      const bMin = Math.min(...bData)
+      const bMax = Math.max(...bData)
+      
+      // 生成缩略图数据
+      for (let y = 0; y < thumbnailHeight; y++) {
+        for (let x = 0; x < thumbnailWidth; x++) {
+          // 计算原始图像坐标（最近邻采样）
+          const origX = Math.floor(x * scaleX)
+          const origY = Math.floor(y * scaleY)
+          const index = origY * width + origX
+          
+          // 获取缩略图像素索引
+          const thumbIndex = (y * thumbnailWidth + x) * 4
+          
+          // 归一化并设置像素值
+          thumbnailData.data[thumbIndex] = Math.round(((rData[index] - rMin) / (rMax - rMin)) * 255)
+          thumbnailData.data[thumbIndex + 1] = Math.round(((gData[index] - gMin) / (gMax - gMin)) * 255)
+          thumbnailData.data[thumbIndex + 2] = Math.round(((bData[index] - bMin) / (bMax - bMin)) * 255)
+          thumbnailData.data[thumbIndex + 3] = 255
+        }
+      }
+    } else if (numBands === 1) {
+      // 单波段图像 - 转换为灰度
+      const bandData = rasterData[0]
+      const min = Math.min(...bandData)
+      const max = Math.max(...bandData)
+      
+      for (let y = 0; y < thumbnailHeight; y++) {
+        for (let x = 0; x < thumbnailWidth; x++) {
+          const origX = Math.floor(x * scaleX)
+          const origY = Math.floor(y * scaleY)
+          const index = origY * width + origX
+          const thumbIndex = (y * thumbnailWidth + x) * 4
+          
+          const value = Math.round(((bandData[index] - min) / (max - min)) * 255)
+          thumbnailData.data[thumbIndex] = value
+          thumbnailData.data[thumbIndex + 1] = value
+          thumbnailData.data[thumbIndex + 2] = value
+          thumbnailData.data[thumbIndex + 3] = 255
+        }
+      }
+    }
+    
+    // 绘制到Canvas
+    ctx.putImageData(thumbnailData, 0, 0)
+    
+  } catch (error) {
+    console.error('加载TIFF缩略图失败:', error)
+    // 绘制错误提示
+    const canvas = canvasRefs.value[image.image_id]
+    if (canvas) {
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#f5f5f5'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = '#999'
+      ctx.font = '12px Arial'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('FAILED', canvas.width / 2, canvas.height / 2)
+    }
+  }
+}
+
+// 更新所有TIFF缩略图
+const updateTiffThumbnails = () => {
+  images.value.forEach(image => {
+    if (image.file_path?.toLowerCase().endsWith('.tif') || image.file_path?.toLowerCase().endsWith('.tiff')) {
+      loadTiffThumbnail(image)
+    }
+  })
+}
 
 // 上传对话框相关
 const uploadDialogVisible = ref(false)
@@ -241,6 +385,11 @@ const getImages = async () => {
       const data = await response.json()
       images.value = data.images
       total.value = data.total
+      
+      // 延迟调用更新缩略图函数，确保DOM已经渲染完成
+      setTimeout(() => {
+        updateTiffThumbnails()
+      }, 100)
     } else {
       throw new Error('获取图像列表失败')
     }
