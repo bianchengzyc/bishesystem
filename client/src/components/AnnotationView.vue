@@ -57,7 +57,7 @@
                   }"
                   @mousedown.stop="selectAnnotation(annotation, $event)"
                 >
-                  <div class="bbox-label">枯死云杉</div>
+                 <!-- <div class="bbox-label">枯死云杉</div>  -->
                   <div class="bbox-controls">
                     <span class="bbox-delete" @click.stop="deleteAnnotation(index)">×</span>
                   </div>

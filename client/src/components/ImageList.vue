@@ -545,20 +545,49 @@ const handleSelectionChange = (selection) => {
   selectedImages.value = selection
 }
 
-const exportSelected = async () => {
-  if (selectedImages.value.length === 0) {
-    ElMessage.warning('请选择要导出的图像')
-    return
-  }
-  
-  const imageIds = selectedImages.value.map(img => img.image_id).join(',')
-  
+// 选择导出格式的弹窗
+const showExportFormatDialog = (exportType, imageIds = null) => {
+  ElMessageBox.confirm(
+    '请选择导出格式',
+    '导出数据',
+    {
+      confirmButtonText: 'YOLO格式',
+      cancelButtonText: 'COCO格式',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      distinguishCancelAndClose: true,
+      type: 'info'
+    }
+  ).then(() => {
+    // 用户选择YOLO格式
+    if (exportType === 'selected') {
+      exportWithFormat('yolo', imageIds)
+    } else {
+      exportAllWithFormat('yolo')
+    }
+  }).catch(action => {
+    if (action === 'cancel') {
+      // 用户选择COCO格式
+      if (exportType === 'selected') {
+        exportWithFormat('coco', imageIds)
+      } else {
+        exportAllWithFormat('coco')
+      }
+    }
+  })
+}
+
+// 带格式参数的导出选中图像
+const exportWithFormat = async (format, imageIds) => {
   try {
-    console.log('开始导出选中图像，image_ids:', imageIds)
+    console.log(`开始导出选中图像 ${format.toUpperCase()} 格式，image_ids:`, imageIds)
     console.log('token:', token.value)
     
-    const response = await axios.get('/api/export/yolo', {
-      params: { image_ids: imageIds },
+    const response = await axios.get('/api/export', {
+      params: { 
+        image_ids: imageIds,
+        format: format
+      },
       headers: {
         'Authorization': `Bearer ${token.value}`
       },
@@ -572,7 +601,7 @@ const exportSelected = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `yolo-export-${Date.now()}.zip`)
+    link.setAttribute('download', `${format}-export-${Date.now()}.zip`)
     document.body.appendChild(link)
     link.click()
     
@@ -596,12 +625,16 @@ const exportSelected = async () => {
   }
 }
 
-const exportAll = async () => {
+// 带格式参数的导出全部图像
+const exportAllWithFormat = async (format) => {
   try {
-    console.log('开始导出全部图像')
+    console.log(`开始导出全部图像 ${format.toUpperCase()} 格式`)
     console.log('token:', token.value)
     
-    const response = await axios.get('/api/export/yolo', {
+    const response = await axios.get('/api/export', {
+      params: { 
+        format: format
+      },
       headers: {
         'Authorization': `Bearer ${token.value}`
       },
@@ -615,7 +648,7 @@ const exportAll = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `yolo-export-${Date.now()}.zip`)
+    link.setAttribute('download', `${format}-export-${Date.now()}.zip`)
     document.body.appendChild(link)
     link.click()
     
@@ -637,6 +670,23 @@ const exportAll = async () => {
     }
     ElMessage.error('导出失败，请重试')
   }
+}
+
+const exportSelected = async () => {
+  if (selectedImages.value.length === 0) {
+    ElMessage.warning('请选择要导出的图像')
+    return
+  }
+  
+  const imageIds = selectedImages.value.map(img => img.image_id).join(',')
+  
+  // 显示格式选择弹窗
+  showExportFormatDialog('selected', imageIds)
+}
+
+const exportAll = async () => {
+  // 显示格式选择弹窗
+  showExportFormatDialog('all')
 }
 
 const handleSizeChange = (size) => {

@@ -104,7 +104,7 @@ const handleLogin = async () => {
 }
 
 .login-form-wrapper {
-  width: 400px;
+  width: 420px;
   padding: 30px;
   background-color: #fff;
   border-radius: 8px;

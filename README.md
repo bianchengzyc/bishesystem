@@ -46,7 +46,7 @@ npm install
 ``bash
 cd server
 node app.js    # 或者使用 npm start 启动
-（如果系统没有管理员账号无法登录，请先使用npm run create-admin创建有个管理员账号）
+（管理员账号：admin，密码：admin123 如果系统没有管理员账号无法登录，请先使用npm run create-admin创建有个管理员账号）
 
 ###  启动前端开发服务器
 # 启动前端开发服务器 (默认端口 5173)
@@ -67,7 +67,7 @@ npm run dev
 
 - 导出选中图像数据: 选择一个或多个图像进行导出
 - 导出全部数据: 导出所有带标注的图像数据
-- 导出格式: YOLO v5/v8 (包含images和labels目录的ZIP文件)
+- 导出格式: YOLO/COCO格式 (可选)
 
 ## 数据库
 
@@ -96,4 +96,4 @@ npm run dev
 
 - 首次启动时会自动创建数据库文件
 - 图像文件会保存在服务器的指定目录
-- 导出的YOLO数据包含图像文件和标注文件
+- 导出的YOLO/COCO数据会保存在浏览器的指定目录
